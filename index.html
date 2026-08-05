@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#170F2B">
+<title>Brawl Chaos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@500;600;700;800&display=swap');
+
+  :root{
+    --bg:#170F2B; --panel:#221B38; --card:#2A2145;
+    --ink:#F3F0FA; --dim:rgba(243,240,250,0.55);
+    --yellow:#FFD666; --pink:#FF5F92; --teal:#2FBFB6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    width:100%;height:100%;overflow:hidden;
+    background:var(--bg);color:var(--ink);
+    font-family:'Inter',sans-serif;
+    overscroll-behavior:none;touch-action:none;user-select:none;
+  }
+
+  .view{position:fixed;inset:0;display:none;}
+  .view.on{display:block;}
+
+  /* ---------- MENU ---------- */
+  #menu{
+    padding:max(14px,env(safe-area-inset-top)) 16px 16px;
+    display:flex;flex-direction:column;
+  }
+  .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .pill{
+    background:rgba(255,255,255,0.08);border-radius:999px;
+    padding:6px 13px;font-weight:700;font-size:13px;white-space:nowrap;
+  }
+  .spacer{flex:1;}
+
+  .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+  .logo{
+    font-family:'Baloo 2';font-weight:800;font-size:clamp(34px,9vw,54px);
+    color:var(--yellow);text-align:center;line-height:1;
+  }
+  .avatar{
+    width:clamp(90px,26vw,130px);aspect-ratio:1;border-radius:26%;
+    background:linear-gradient(160deg,var(--pink),#9E7BE0);
+    border:3px solid rgba(255,255,255,0.3);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2';font-weight:800;font-size:clamp(36px,10vw,52px);
+  }
+  .hint{font-size:12px;color:var(--dim);text-align:center;line-height:1.5;max-width:320px;}
+
+  .modes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+  .mode{
+    background:var(--card);border:1px solid rgba(255,255,255,0.08);
+    border-radius:12px;padding:9px 14px;font-size:12px;font-weight:700;
+    letter-spacing:0.04em;text-transform:uppercase;color:var(--dim);
+  }
+  .mode.active{border-color:var(--yellow);color:var(--yellow);}
+  .mode.off{opacity:0.35;}
+
+  .btn-combat{
+    width:100%;border:none;border-radius:16px;padding:18px;
+    font-family:'Baloo 2';font-weight:800;font-size:24px;
+    background:var(--yellow);color:#4A3308;
+    box-shadow:0 5px 0 #C9A03C;cursor:pointer;
+  }
+  .btn-combat:active{transform:translateY(5px);box-shadow:none;}
+
+  /* ---------- GAME ---------- */
+  #game{background:#0F0C1A;}
+  canvas{display:block;width:100%;height:100%;}
+  #back{
+    position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;
+    background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.18);
+    color:var(--ink);border-radius:10px;padding:8px 14px;
+    font-size:13px;font-weight:700;cursor:pointer;z-index:5;
+  }
+  #score{
+    position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);
+    font-family:'Baloo 2';font-weight:700;font-size:18px;
+    background:rgba(0,0,0,0.4);border-radius:10px;padding:6px 16px;z-index:5;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="view on">
+  <div class="topbar">
+    <span class="pill">Niv. 27</span>
+    <span class="spacer"></span>
+    <span class="pill">🏆 2 480</span>
+    <span class="pill">💎 142</span>
+    <span class="pill">🪙 9 350</span>
+  </div>
+
+  <div class="center">
+    <div class="logo">BRAWL<br>CHAOS</div>
+    <div class="avatar">V</div>
+    <div class="hint">
+      Fonce dans ton adversaire avec le dash pour l'éjecter hors de l'arène.<br>
+      Mobile : joystick à gauche, bouton dash à droite.<br>
+      Clavier : ZQSD + Espace &nbsp;·&nbsp; Flèches + Entrée
+    </div>
+  </div>
+
+  <div class="modes">
+    <div class="mode active">⚔️ Standard</div>
+    <div class="mode off">🛡️ Équipes</div>
+    <div class="mode off">⛰️ Colline</div>
+  </div>
+  <button class="btn-combat" id="play">COMBAT</button>
+</div>
+
+<!-- ================= GAME ================= -->
+<div id="game" class="view">
+  <canvas id="cv"></canvas>
+  <button id="back">◀ Menu</button>
+  <div id="score">0 — 0</div>
+</div>
+
+<script>
+"use strict";
+
+const menuView = document.getElementById('menu');
+const gameView = document.getElementById('game');
+const scoreEl  = document.getElementById('score');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+let running = false;
+let W = 0, H = 0, DPR = 1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width  = Math.floor(W * DPR);
+  cv.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  layoutControls();
+}
+window.addEventListener('resize', resize);
+
+/* ---------------- ARENA ---------------- */
+// L'arène est un cercle centré : sortir du cercle = élimination (chaos !)
+let arena = {cx:0, cy:0, r:0};
+let obstacle = {x:0, y:0, r:0};
+
+function layoutArena(){
+  arena.cx = W/2; arena.cy = H/2;
+  arena.r = Math.min(W,H)*0.42;
+  obstacle.x = arena.cx; obstacle.y = arena.cy;
+  obstacle.r = arena.r*0.13;
+}
+
+/* ---------------- PLAYERS ---------------- */
+const RADIUS = 18;
+function makePlayer(id, color){
+  return {
+    id, color,
+    x:0, y:0, vx:0, vy:0,
+    dashing:false, dashT:0, cdT:0, stunT:0,
+    dx:0, dy:0, alive:true, score:0
+  };
+}
+const P1 = makePlayer(1, '#FF5F92');
+const P2 = makePlayer(2, '#2FBFB6');
+const players = [P1, P2];
+
+const SPEED=250, DASH_SPEED=880, DASH_TIME=0.16, DASH_CD=1.0, KNOCK=760, FRICTION=3.2;
+
+function resetRound(){
+  layoutArena();
+  P1.x = arena.cx - arena.r*0.45; P1.y = arena.cy;
+  P2.x = arena.cx + arena.r*0.45; P2.y = arena.cy;
+  for(const p of players){
+    p.vx=p.vy=0; p.dashing=false; p.dashT=0; p.cdT=0; p.stunT=0; p.alive=true;
+  }
+  updateScore();
+}
+function updateScore(){ scoreEl.textContent = P1.score + ' — ' + P2.score; }
+
+/* ---------------- INPUT: KEYBOARD ---------------- */
+const keys = {};
+addEventListener('keydown', e=>{ keys[e.code]=true; if(running) e.preventDefault(); }, {passive:false});
+addEventListener('keyup',   e=>{ keys[e.code]=false; });
+
+function keyVec(p){
+  let x=0,y=0;
+  if(p.id===1){
+    if(keys['KeyD']) x++; if(keys['KeyA']) x--;
+    if(keys['KeyS']) y++; if(keys['KeyW']) y--;
+  } else {
+    if(keys['ArrowRight']) x++; if(keys['ArrowLeft']) x--;
+    if(keys['ArrowDown'])  y++; if(keys['ArrowUp'])   y--;
+  }
+  const m = Math.hypot(x,y);
+  return m ? {x:x/m, y:y/m} : {x:0,y:0};
+}
+function keyDash(p){
+  return p.id===1 ? !!keys['Space'] : (!!keys['Enter'] || !!keys['NumpadEnter']);
+}
+
+/* ---------------- INPUT: TOUCH ---------------- */
+const stick = {cx:0, cy:0, r:0, kx:0, ky:0, id:null, vx:0, vy:0};
+const dashBtn = {cx:0, cy:0, r:0, id:null, queued:false, flash:0};
+
+function layoutControls(){
+  const s = Math.min(W,H);
+  stick.r = Math.max(48, s*0.14);
+  stick.cx = 20 + stick.r;
+  stick.cy = H - 20 - stick.r;
+  stick.kx = stick.cx; stick.ky = stick.cy;
+
+  dashBtn.r = Math.max(36, s*0.10);
+  dashBtn.cx = W - 20 - dashBtn.r;
+  dashBtn.cy = H - 20 - dashBtn.r;
+}
+
+function touchPos(t){
+  const rect = cv.getBoundingClientRect();
+  return {x: t.clientX - rect.left, y: t.clientY - rect.top};
+}
+function dist(ax,ay,bx,by){ return Math.hypot(ax-bx, ay-by); }
+
+cv.addEventListener('touchstart', e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches){
+    const p = touchPos(t);
+    if(stick.id===null && dist(p.x,p.y,stick.cx,stick.cy) < stick.r*1.9){
+      stick.id = t.identifier; moveStick(p);
+    } else if(dist(p.x,p.y,dashBtn.cx,dashBtn.cy) < dashBtn.r*1.4){
+      dashBtn.queued = true; dashBtn.flash = 0.18;
+    }
+  }
+}, {passive:false});
+
+cv.addEventListener('touchmove', e=>{
+  e.preventDefault();
+  for(const t of e.changedTouches){
+    if(t.identifier===stick.id) moveStick(touchPos(t));
+  }
+}, {passive:false});
+
+function endTouch(e){
+  e.preventDefault();
+  for(const t of e.changedTouches){
+    if(t.identifier===stick.id){
+      stick.id=null; stick.vx=0; stick.vy=0;
+      stick.kx=stick.cx; stick.ky=stick.cy;
+    }
+  }
+}
+cv.addEventListener('touchend', endTouch, {passive:false});
+cv.addEventListener('touchcancel', endTouch, {passive:false});
+
+function moveStick(p){
+  let dx = p.x - stick.cx, dy = p.y - stick.cy;
+  const m = Math.hypot(dx,dy);
+  if(m > stick.r){ dx = dx/m*stick.r; dy = dy/m*stick.r; }
+  stick.kx = stick.cx + dx; stick.ky = stick.cy + dy;
+  stick.vx = dx/stick.r; stick.vy = dy/stick.r;
+}
+
+// Souris = test des contrôles tactiles sur PC
+cv.addEventListener('mousedown', e=>{
+  const rect = cv.getBoundingClientRect();
+  const p = {x:e.clientX-rect.left, y:e.clientY-rect.top};
+  if(dist(p.x,p.y,stick.cx,stick.cy) < stick.r*1.9){ stick.id='mouse'; moveStick(p); }
+  else if(dist(p.x,p.y,dashBtn.cx,dashBtn.cy) < dashBtn.r*1.4){ dashBtn.queued=true; dashBtn.flash=0.18; }
+});
+addEventListener('mousemove', e=>{
+  if(stick.id!=='mouse') return;
+  const rect = cv.getBoundingClientRect();
+  moveStick({x:e.clientX-rect.left, y:e.clientY-rect.top});
+});
+addEventListener('mouseup', ()=>{
+  if(stick.id==='mouse'){ stick.id=null; stick.vx=0; stick.vy=0; stick.kx=stick.cx; stick.ky=stick.cy; }
+});
+
+/* ---------------- INPUT MERGE ---------------- */
+function inputVec(p){
+  if(p.id===1){
+    const m = Math.hypot(stick.vx, stick.vy);
+    if(m > 0.18) return {x:stick.vx/m, y:stick.vy/m};
+  }
+  return keyVec(p);
+}
+function dashPressed(p){
+  if(p.id===1 && dashBtn.queued){ dashBtn.queued=false; return true; }
+  return keyDash(p);
+}
+
+/* ---------------- UPDATE ---------------- */
+function update(dt){
+  for(const p of players){
+    if(!p.alive) continue;
+    p.cdT   = Math.max(0, p.cdT   - dt);
+    p.stunT = Math.max(0, p.stunT - dt);
+
+    const dir = inputVec(p);
+
+    if(p.dashing){
+      p.dashT -= dt;
+      p.vx = p.dx*DASH_SPEED; p.vy = p.dy*DASH_SPEED;
+      if(p.dashT <= 0) p.dashing = false;
+    } else if(p.stunT > 0){
+      p.vx -= p.vx*FRICTION*dt; p.vy -= p.vy*FRICTION*dt;
+    } else if(dashPressed(p) && p.cdT<=0 && (dir.x||dir.y)){
+      p.dashing=true; p.dashT=DASH_TIME; p.cdT=DASH_CD;
+      p.dx=dir.x; p.dy=dir.y;
+      p.vx=dir.x*DASH_SPEED; p.vy=dir.y*DASH_SPEED;
+    } else if(dir.x||dir.y){
+      p.vx = dir.x*SPEED; p.vy = dir.y*SPEED;
+    } else {
+      p.vx -= p.vx*FRICTION*dt; p.vy -= p.vy*FRICTION*dt;
+    }
+
+    p.x += p.vx*dt; p.y += p.vy*dt;
+  }
+
+  // collision avec l'obstacle central
+  for(const p of players){
+    if(!p.alive) continue;
+    const d = dist(p.x,p.y,obstacle.x,obstacle.y), min = obstacle.r + RADIUS;
+    if(d < min && d > 0){
+      const nx=(p.x-obstacle.x)/d, ny=(p.y-obstacle.y)/d;
+      p.x = obstacle.x + nx*min; p.y = obstacle.y + ny*min;
+      // rebond : le chaos vient aussi du décor
+      const dot = p.vx*nx + p.vy*ny;
+      p.vx -= 2*dot*nx*0.6; p.vy -= 2*dot*ny*0.6;
+      if(p.dashing){ p.dashing=false; }
+    }
+  }
+
+  // collision joueur vs joueur : un dash qui touche éjecte l'autre
+  if(P1.alive && P2.alive){
+    const d = dist(P1.x,P1.y,P2.x,P2.y), min = RADIUS*2;
+    if(d < min && d > 0){
+      const nx=(P2.x-P1.x)/d, ny=(P2.y-P1.y)/d;
+      const overlap = (min-d)/2;
+      P1.x -= nx*overlap; P1.y -= ny*overlap;
+      P2.x += nx*overlap; P2.y += ny*overlap;
+
+      if(P1.dashing && !P2.dashing){
+        P2.vx = nx*KNOCK; P2.vy = ny*KNOCK; P2.stunT=0.35; P2.dashing=false;
+        P1.dashing=false; P1.vx*=-0.2; P1.vy*=-0.2;
+      } else if(P2.dashing && !P1.dashing){
+        P1.vx =-nx*KNOCK; P1.vy =-ny*KNOCK; P1.stunT=0.35; P1.dashing=false;
+        P2.dashing=false; P2.vx*=-0.2; P2.vy*=-0.2;
+      } else if(P1.dashing && P2.dashing){
+        // choc frontal : les deux partent en arrière
+        P1.vx=-nx*KNOCK*0.7; P1.vy=-ny*KNOCK*0.7; P1.dashing=false; P1.stunT=0.3;
+        P2.vx= nx*KNOCK*0.7; P2.vy= ny*KNOCK*0.7; P2.dashing=false; P2.stunT=0.3;
+      }
+    }
+  }
+
+  // élimination : sortir du cercle
+  for(const p of players){
+    if(!p.alive) continue;
+    if(dist(p.x,p.y,arena.cx,arena.cy) > arena.r + RADIUS){
+      p.alive = false;
+      const other = (p===P1) ? P2 : P1;
+      other.score++;
+      updateScore();
+      setTimeout(()=>{ if(running) resetRound(); }, 700);
+    }
+  }
+
+  if(dashBtn.flash>0) dashBtn.flash -= dt;
+}
+
+/* ---------------- DRAW ---------------- */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // sol de l'arène
+  ctx.fillStyle = '#1C1730';
+  ctx.beginPath(); ctx.arc(arena.cx,arena.cy,arena.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,214,102,0.5)'; ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.arc(arena.cx,arena.cy,arena.r,0,Math.PI*2); ctx.stroke();
+
+  // obstacle central
+  ctx.fillStyle = '#3A3358';
+  ctx.beginPath(); ctx.arc(obstacle.x,obstacle.y,obstacle.r,0,Math.PI*2); ctx.fill();
+
+  // joueurs
+  for(const p of players){
+    if(!p.alive) continue;
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,RADIUS,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(p.x,p.y,RADIUS,0,Math.PI*2); ctx.stroke();
+
+    // traînée de dash
+    if(p.dashing){
+      ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=6;
+      ctx.beginPath(); ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x - p.dx*26, p.y - p.dy*26); ctx.stroke();
+    }
+    // anneau de cooldown
+    if(p.cdT>0){
+      const ratio = 1 - p.cdT/DASH_CD;
+      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=3;
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,RADIUS+6,-Math.PI/2,-Math.PI/2 + Math.PI*2*ratio);
+      ctx.stroke();
+    }
+  }
+
+  drawControls();
+}
+
+function drawControls(){
+  // joystick
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.arc(stick.cx,stick.cy,stick.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(stick.cx,stick.cy,stick.r,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.32)';
+  ctx.beginPath(); ctx.arc(stick.kx,stick.ky,stick.r*0.4,0,Math.PI*2); ctx.fill();
+
+  // bouton dash
+  const a = dashBtn.flash>0 ? 0.5 : 0.25;
+  ctx.fillStyle=`rgba(255,214,102,${a})`;
+  ctx.beginPath(); ctx.arc(dashBtn.cx,dashBtn.cy,dashBtn.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,214,102,0.75)'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(dashBtn.cx,dashBtn.cy,dashBtn.r,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.font=`700 ${Math.round(dashBtn.r*0.45)}px Inter, sans-serif`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('DASH', dashBtn.cx, dashBtn.cy);
+}
+
+/* ---------------- LOOP ---------------- */
+let last = 0;
+function loop(ts){
+  if(!running) return;
+  if(!last) last = ts;
+  const dt = Math.min((ts-last)/1000, 0.033);
+  last = ts;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+/* ---------------- NAVIGATION ---------------- */
+document.getElementById('play').addEventListener('click', ()=>{
+  menuView.classList.remove('on');
+  gameView.classList.add('on');
+  running = true; last = 0;
+  P1.score = 0; P2.score = 0;
+  resize(); resetRound();
+  requestAnimationFrame(loop);
+});
+
+document.getElementById('back').addEventListener('click', ()=>{
+  running = false;
+  gameView.classList.remove('on');
+  menuView.classList.add('on');
+});
+</script>
+</body>
+</html>
