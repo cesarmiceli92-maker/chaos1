@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#170F2B">
+<title>Brawl Chaos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@500;600;700;800&display=swap');
+
+  :root{
+    --bg:#170F2B; --panel:#221B38; --card:#2A2145;
+    --ink:#F3F0FA; --dim:rgba(243,240,250,0.55);
+    --yellow:#FFD666; --pink:#FF5F92; --teal:#2FBFB6;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{
+    width:100%;height:100%;overflow:hidden;
+    background:var(--bg);color:var(--ink);
+    font-family:'Inter',sans-serif;
+    overscroll-behavior:none;touch-action:none;user-select:none;
+  }
+
+  .view{position:fixed;inset:0;display:none;}
+  .view.on{display:block;}
+
+  /* ---------- MENU ---------- */
+  #menu{
+    padding:max(14px,env(safe-area-inset-top)) 16px 16px;
+    display:flex;flex-direction:column;
+  }
+  .topbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .pill{
+    background:rgba(255,255,255,0.08);border-radius:999px;
+    padding:6px 13px;font-weight:700;font-size:13px;white-space:nowrap;
+  }
+  .spacer{flex:1;}
+
+  /* sélecteur de langue */
+  .lang-wrap{position:relative;}
+  #langBtn{
+    background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.14);
+    color:var(--ink);border-radius:999px;
+    padding:6px 13px;font-weight:700;font-size:13px;
+    font-family:inherit;cursor:pointer;display:flex;align-items:center;gap:6px;
+  }
+  #langMenu{
+    display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:20;
+    background:var(--card);border:1px solid rgba(255,255,255,0.14);
+    border-radius:12px;overflow:hidden;min-width:150px;
+    box-shadow:0 8px 24px rgba(0,0,0,0.45);
+  }
+  #langMenu.open{display:block;}
+  #langMenu button{
+    display:block;width:100%;text-align:left;
+    background:none;border:none;color:var(--ink);
+    font-family:inherit;font-size:14px;font-weight:600;
+    padding:11px 14px;cursor:pointer;
+  }
+  #langMenu button:hover{background:rgba(255,255,255,0.08);}
+  #langMenu button.sel{color:var(--yellow);}
+
+  .center{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;}
+  .logo{
+    font-family:'Baloo 2';font-weight:800;font-size:clamp(34px,9vw,54px);
+    color:var(--yellow);text-align:center;line-height:1;
+  }
+  .avatar{
+    width:clamp(90px,26vw,130px);aspect-ratio:1;border-radius:26%;
+    background:linear-gradient(160deg,var(--pink),#9E7BE0);
+    border:3px solid rgba(255,255,255,0.3);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Baloo 2';font-weight:800;font-size:clamp(36px,10vw,52px);
+  }
+  .hint{font-size:12px;color:var(--dim);text-align:center;line-height:1.6;max-width:340px;}
+
+  .modes{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+  .mode{
+    background:var(--card);border:1px solid rgba(255,255,255,0.08);
+    border-radius:12px;padding:9px 14px;font-size:12px;font-weight:700;
+    letter-spacing:0.04em;text-transform:uppercase;color:var(--dim);
+    cursor:pointer;font-family:inherit;
+  }
+  .mode.active{border-color:var(--yellow);color:var(--yellow);}
+  .mode.off{opacity:0.35;cursor:default;}
+
+  .btn-combat{
+    width:100%;border:none;border-radius:16px;padding:18px;
+    font-family:'Baloo 2';font-weight:800;font-size:24px;
+    background:var(--yellow);color:#4A3308;
+    box-shadow:0 5px 0 #C9A03C;cursor:pointer;
+  }
+  .btn-combat:active{transform:translateY(5px);box-shadow:none;}
+
+  /* ---------- GAME ---------- */
+  #game{background:#0F0C1A;}
+  canvas{display:block;width:100%;height:100%;}
+  #back{
+    position:absolute;top:max(12px,env(safe-area-inset-top));left:12px;
+    background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.18);
+    color:var(--ink);border-radius:10px;padding:8px 14px;
+    font-size:13px;font-weight:700;cursor:pointer;z-index:5;font-family:inherit;
+  }
+  #score{
+    position:absolute;top:max(12px,env(safe-area-inset-top));left:50%;
+    transform:translateX(-50%);
+    font-family:'Baloo 2';font-weight:700;font-size:18px;
+    background:rgba(0,0,0,0.4);border-radius:10px;padding:6px 16px;z-index:5;
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= MENU ================= -->
+<div id="menu" class="view on">
+  <div class="topbar">
+    <span class="pill" data-i18n="level">Niv. 27</span>
+    <span class="spacer"></span>
+    <span class="pill">🏆 2 480</span>
+    <span class="pill">💎 142</span>
+    <div class="lang-wrap">
+      <button id="langBtn">🌐 <span id="langLabel">FR</span> ▾</button>
+      <div id="langMenu">
+        <button data-lang="fr">🇫🇷 Français</button>
+        <button data-lang="en">🇬🇧 English</button>
+        <button data-lang="es">🇪🇸 Español</button>
+        <button data-lang="pt">🇧🇷 Português</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="center">
+    <div class="logo">BRAWL<br>CHAOS</div>
+    <div class="avatar">V</div>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="modes">
+    <button class="mode active" id="modeSolo"></button>
+    <button class="mode" id="modeDuo"></button>
+    <button class="mode off" id="modeTeams"></button>
+  </div>
+  <button class="btn-combat" id="play"></button>
+</div>
+
+<!-- ================= GAME ================= -->
+<div id="game" class="view">
+  <canvas id="cv"></canvas>
+  <button id="back"></button>
+  <div id="score">0 — 0</div>
+</div>
+
+<script>
+"use strict";
+
+/* ================= LANGUES ================= */
+const I18N = {
+  fr:{
+    label:"FR", level:"Niv. 27", play:"COMBAT", back:"◀ Menu",
+    solo:"⚔️ Solo (Bot)", duo:"👥 2 Joueurs", teams:"🛡️ Équipes",
+    hintSolo:"Vise ton dash pour éjecter le bot hors de l'arène.<br>Mobile : joystick à gauche, maintiens le bouton DASH et fais glisser pour viser, relâche pour foncer.<br>Clavier : ZQSD pour bouger · maintiens Espace pour viser, relâche pour dasher",
+    hintDuo:"Deux joueurs sur le même clavier.<br>Joueur rose : ZQSD + Espace (maintenir pour viser)<br>Joueur turquoise : Flèches + Entrée (maintenir pour viser)",
+    you:"Toi", bot:"Bot"
+  },
+  en:{
+    label:"EN", level:"Lvl. 27", play:"BATTLE", back:"◀ Menu",
+    solo:"⚔️ Solo (Bot)", duo:"👥 2 Players", teams:"🛡️ Teams",
+    hintSolo:"Aim your dash to knock the bot out of the arena.<br>Mobile: joystick on the left, hold the DASH button and drag to aim, release to charge.<br>Keyboard: WASD to move · hold Space to aim, release to dash",
+    hintDuo:"Two players on the same keyboard.<br>Pink player: WASD + Space (hold to aim)<br>Teal player: Arrows + Enter (hold to aim)",
+    you:"You", bot:"Bot"
+  },
+  es:{
+    label:"ES", level:"Niv. 27", play:"COMBATE", back:"◀ Menú",
+    solo:"⚔️ Solo (Bot)", duo:"👥 2 Jugadores", teams:"🛡️ Equipos",
+    hintSolo:"Apunta tu embestida para sacar al bot de la arena.<br>Móvil: joystick a la izquierda, mantén el botón DASH y arrastra para apuntar, suelta para lanzarte.<br>Teclado: WASD para moverte · mantén Espacio para apuntar, suelta para embestir",
+    hintDuo:"Dos jugadores en el mismo teclado.<br>Jugador rosa: WASD + Espacio (mantener para apuntar)<br>Jugador turquesa: Flechas + Enter (mantener para apuntar)",
+    you:"Tú", bot:"Bot"
+  },
+  pt:{
+    label:"PT", level:"Nív. 27", play:"COMBATE", back:"◀ Menu",
+    solo:"⚔️ Solo (Bot)", duo:"👥 2 Jogadores", teams:"🛡️ Equipes",
+    hintSolo:"Mire seu avanço para jogar o bot para fora da arena.<br>Celular: joystick à esquerda, segure o botão DASH e arraste para mirar, solte para avançar.<br>Teclado: WASD para mover · segure Espaço para mirar, solte para avançar",
+    hintDuo:"Dois jogadores no mesmo teclado.<br>Jogador rosa: WASD + Espaço (segure para mirar)<br>Jogador turquesa: Setas + Enter (segure para mirar)",
+    you:"Você", bot:"Bot"
+  }
+};
+
+let lang = (localStorage.getItem('bc_lang')) || (navigator.language||'fr').slice(0,2);
+if(!I18N[lang]) lang = 'fr';
+
+let soloMode = true;
+
+function applyLang(){
+  const t = I18N[lang];
+  document.getElementById('langLabel').textContent = t.label;
+  document.querySelector('[data-i18n="level"]').textContent = t.level;
+  document.getElementById('play').textContent = t.play;
+  document.getElementById('back').textContent = t.back;
+  document.getElementById('modeSolo').textContent = t.solo;
+  document.getElementById('modeDuo').textContent = t.duo;
+  document.getElementById('modeTeams').textContent = t.teams;
+  document.getElementById('hint').innerHTML = soloMode ? t.hintSolo : t.hintDuo;
+  document.documentElement.lang = lang;
+  [...document.querySelectorAll('#langMenu button')].forEach(b=>{
+    b.classList.toggle('sel', b.dataset.lang===lang);
+  });
+  updateScore();
+}
+
+const langBtn  = document.getElementById('langBtn');
+const langMenu = document.getElementById('langMenu');
+langBtn.addEventListener('click', e=>{ e.stopPropagation(); langMenu.classList.toggle('open'); });
+document.addEventListener('click', ()=> langMenu.classList.remove('open'));
+langMenu.addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  lang = b.dataset.lang;
+  localStorage.setItem('bc_lang', lang);
+  langMenu.classList.remove('open');
+  applyLang();
+});
+
+/* mode solo / duo */
+const modeSolo = document.getElementById('modeSolo');
+const modeDuo  = document.getElementById('modeDuo');
+modeSolo.addEventListener('click', ()=>{ soloMode=true;  modeSolo.classList.add('active'); modeDuo.classList.remove('active'); applyLang(); });
+modeDuo .addEventListener('click', ()=>{ soloMode=false; modeDuo.classList.add('active');  modeSolo.classList.remove('active'); applyLang(); });
+
+/* ================= SETUP ================= */
+const menuView = document.getElementById('menu');
+const gameView = document.getElementById('game');
+const scoreEl  = document.getElementById('score');
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+let running=false, W=0, H=0, DPR=1;
+
+function resize(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.floor(W*DPR); cv.height = Math.floor(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  layoutControls(); layoutArena();
+}
+window.addEventListener('resize', resize);
+
+let arena={cx:0,cy:0,r:0}, obstacle={x:0,y:0,r:0};
+function layoutArena(){
+  arena.cx=W/2; arena.cy=H/2; arena.r=Math.min(W,H)*0.42;
+  obstacle.x=arena.cx; obstacle.y=arena.cy; obstacle.r=arena.r*0.13;
+}
+
+/* ================= JOUEURS ================= */
+const RADIUS=18;
+const SPEED=250, DASH_SPEED=900, DASH_TIME=0.17, DASH_CD=1.0, KNOCK=780, FRICTION=3.2;
+const AIM_SLOW=0.35; // on ralentit pendant la visée
+
+function makePlayer(id,color){
+  return {id,color,x:0,y:0,vx:0,vy:0,
+    dashing:false,dashT:0,cdT:0,stunT:0,dx:0,dy:0,
+    aiming:false, aimX:1, aimY:0,
+    alive:true,score:0, isBot:false, botT:0, botAimT:0};
+}
+const P1=makePlayer(1,'#FF5F92');
+const P2=makePlayer(2,'#2FBFB6');
+const players=[P1,P2];
+
+function resetRound(){
+  layoutArena();
+  P1.x=arena.cx-arena.r*0.45; P1.y=arena.cy;
+  P2.x=arena.cx+arena.r*0.45; P2.y=arena.cy;
+  for(const p of players){
+    p.vx=p.vy=0; p.dashing=false; p.dashT=0; p.cdT=0; p.stunT=0;
+    p.aiming=false; p.alive=true; p.botT=0; p.botAimT=0;
+  }
+  P1.aimX=1; P1.aimY=0; P2.aimX=-1; P2.aimY=0;
+  updateScore();
+}
+function updateScore(){
+  const t=I18N[lang];
+  const n1 = soloMode ? t.you : 'P1';
+  const n2 = soloMode ? t.bot : 'P2';
+  scoreEl.textContent = `${n1} ${P1.score} — ${P2.score} ${n2}`;
+}
+
+/* ================= CLAVIER ================= */
+const keys={};
+addEventListener('keydown',e=>{keys[e.code]=true; if(running)e.preventDefault();},{passive:false});
+addEventListener('keyup',  e=>{keys[e.code]=false;});
+
+function keyVec(p){
+  let x=0,y=0;
+  if(p.id===1){
+    if(keys['KeyD'])x++; if(keys['KeyA'])x--;
+    if(keys['KeyS'])y++; if(keys['KeyW'])y--;
+  } else {
+    if(keys['ArrowRight'])x++; if(keys['ArrowLeft'])x--;
+    if(keys['ArrowDown'])y++;  if(keys['ArrowUp'])y--;
+  }
+  const m=Math.hypot(x,y);
+  return m?{x:x/m,y:y/m}:{x:0,y:0};
+}
+function keyDashHeld(p){
+  return p.id===1 ? !!keys['Space'] : (!!keys['Enter']||!!keys['NumpadEnter']);
+}
+
+/* ================= TACTILE ================= */
+const stick={cx:0,cy:0,r:0,kx:0,ky:0,id:null,vx:0,vy:0};
+// Le bouton dash devient un stick de visée : on maintient, on glisse pour viser, on relâche pour foncer.
+const dashBtn={cx:0,cy:0,r:0,id:null,aiming:false,ax:0,ay:0,flash:0};
+
+function layoutControls(){
+  const s=Math.min(W,H);
+  stick.r=Math.max(48,s*0.14);
+  stick.cx=20+stick.r; stick.cy=H-20-stick.r;
+  stick.kx=stick.cx; stick.ky=stick.cy;
+  dashBtn.r=Math.max(40,s*0.11);
+  dashBtn.cx=W-20-dashBtn.r; dashBtn.cy=H-20-dashBtn.r;
+}
+function cvPos(t){const r=cv.getBoundingClientRect();return{x:t.clientX-r.left,y:t.clientY-r.top};}
+function dist(ax,ay,bx,by){return Math.hypot(ax-bx,ay-by);}
+
+function startTouch(p,ident){
+  if(stick.id===null && dist(p.x,p.y,stick.cx,stick.cy)<stick.r*1.9){
+    stick.id=ident; moveStick(p); return true;
+  }
+  if(dashBtn.id===null && dist(p.x,p.y,dashBtn.cx,dashBtn.cy)<dashBtn.r*1.5){
+    dashBtn.id=ident; dashBtn.aiming=true; dashBtn.ax=0; dashBtn.ay=0; return true;
+  }
+  return false;
+}
+function moveTouch(p,ident){
+  if(ident===stick.id) moveStick(p);
+  else if(ident===dashBtn.id){
+    let dx=p.x-dashBtn.cx, dy=p.y-dashBtn.cy;
+    const m=Math.hypot(dx,dy);
+    if(m>6){ dashBtn.ax=dx/m; dashBtn.ay=dy/m; }
+  }
+}
+function endTouch(ident){
+  if(ident===stick.id){
+    stick.id=null; stick.vx=0; stick.vy=0; stick.kx=stick.cx; stick.ky=stick.cy;
+  } else if(ident===dashBtn.id){
+    dashBtn.id=null; dashBtn.aiming=false; dashBtn.flash=0.18;
+    // relâcher = déclencher le dash dans la direction visée
+    tryDash(P1, dashBtn.ax||P1.aimX, dashBtn.ay||P1.aimY);
+  }
+}
+
+cv.addEventListener('touchstart',e=>{e.preventDefault();
+  for(const t of e.changedTouches) startTouch(cvPos(t), t.identifier);
+},{passive:false});
+cv.addEventListener('touchmove',e=>{e.preventDefault();
+  for(const t of e.changedTouches) moveTouch(cvPos(t), t.identifier);
+},{passive:false});
+function tEnd(e){e.preventDefault(); for(const t of e.changedTouches) endTouch(t.identifier);}
+cv.addEventListener('touchend',tEnd,{passive:false});
+cv.addEventListener('touchcancel',tEnd,{passive:false});
+
+function moveStick(p){
+  let dx=p.x-stick.cx, dy=p.y-stick.cy;
+  const m=Math.hypot(dx,dy);
+  if(m>stick.r){dx=dx/m*stick.r; dy=dy/m*stick.r;}
+  stick.kx=stick.cx+dx; stick.ky=stick.cy+dy;
+  stick.vx=dx/stick.r; stick.vy=dy/stick.r;
+}
+
+// Souris : test des contrôles tactiles sur PC
+cv.addEventListener('mousedown',e=>{
+  const r=cv.getBoundingClientRect();
+  startTouch({x:e.clientX-r.left,y:e.clientY-r.top},'mouse');
+});
+addEventListener('mousemove',e=>{
+  const r=cv.getBoundingClientRect();
+  moveTouch({x:e.clientX-r.left,y:e.clientY-r.top},'mouse');
+});
+addEventListener('mouseup',()=>endTouch('mouse'));
+
+/* ================= VISÉE + DASH ================= */
+function tryDash(p,ax,ay){
+  if(!p.alive || p.cdT>0 || p.dashing) return;
+  const m=Math.hypot(ax,ay); if(!m) return;
+  p.dashing=true; p.dashT=DASH_TIME; p.cdT=DASH_CD;
+  p.dx=ax/m; p.dy=ay/m;
+  p.vx=p.dx*DASH_SPEED; p.vy=p.dy*DASH_SPEED;
+  p.aiming=false;
+}
+
+/* ================= BOT (niveau moyen) ================= */
+// Volontairement imparfait : temps de réaction, visée approximative,
+// et il rate parfois exprès — le but est que ce soit drôle, pas imbattable.
+function botThink(bot, target, dt){
+  bot.botT -= dt;
+
+  const toT = {x:target.x-bot.x, y:target.y-bot.y};
+  const d = Math.hypot(toT.x,toT.y) || 1;
+  const nx=toT.x/d, ny=toT.y/d;
+
+  // sécurité : si trop près du bord, il revient vers le centre
+  const dCenter = dist(bot.x,bot.y,arena.cx,arena.cy);
+  const edgeRisk = dCenter > arena.r*0.72;
+
+  let mvx=0, mvy=0;
+  if(edgeRisk){
+    mvx=(arena.cx-bot.x)/dCenter; mvy=(arena.cy-bot.y)/dCenter;
+  } else if(d>150){
+    mvx=nx; mvy=ny;                       // approche
+  } else if(d<70){
+    mvx=-nx*0.6; mvy=-ny*0.6;             // recule un peu pour prendre de l'élan
+  } else {
+    // tourne autour de la cible (plus vivant à regarder)
+    mvx=-ny*0.8; mvy=nx*0.8;
+  }
+  bot.botMoveX=mvx; bot.botMoveY=mvy;
+
+  // décision de dash
+  if(bot.botT<=0 && bot.cdT<=0 && !bot.dashing && !edgeRisk){
+    if(d<260 && Math.random()<0.75){
+      // visée approximative : erreur d'angle, plus grande si la cible bouge vite
+      const tSpeed=Math.hypot(target.vx,target.vy);
+      const err=(Math.random()-0.5)*(0.35 + Math.min(tSpeed/1600,0.35));
+      // petite anticipation du mouvement de la cible (imparfaite)
+      const lead=0.10;
+      let ax=(target.x+target.vx*lead)-bot.x;
+      let ay=(target.y+target.vy*lead)-bot.y;
+      const m=Math.hypot(ax,ay)||1; ax/=m; ay/=m;
+      const ca=Math.cos(err), sa=Math.sin(err);
+      tryDash(bot, ax*ca-ay*sa, ax*sa+ay*ca);
+      bot.botT=0.5+Math.random()*0.6;   // temps de réaction avant la prochaine décision
+    } else {
+      bot.botT=0.25+Math.random()*0.35;
+    }
+  }
+}
+
+/* ================= UPDATE ================= */
+function update(dt){
+  // --- bot ---
+  if(soloMode && P2.alive && P1.alive) botThink(P2,P1,dt);
+
+  for(const p of players){
+    if(!p.alive) continue;
+    p.cdT=Math.max(0,p.cdT-dt);
+    p.stunT=Math.max(0,p.stunT-dt);
+
+    let dir;
+    if(p.isBot){ dir={x:p.botMoveX||0,y:p.botMoveY||0}; }
+    else if(p.id===1){
+      const m=Math.hypot(stick.vx,stick.vy);
+      dir = m>0.18 ? {x:stick.vx/m,y:stick.vy/m} : keyVec(p);
+    } else dir=keyVec(p);
+
+    // --- visée clavier : maintenir la touche dash ---
+    if(!p.isBot){
+      const held=keyDashHeld(p);
+      if(held && p.cdT<=0 && !p.dashing){
+        p.aiming=true;
+        if(dir.x||dir.y){ p.aimX=dir.x; p.aimY=dir.y; }
+      } else if(!held && p.aiming){
+        p.aiming=false;
+        tryDash(p,p.aimX,p.aimY);
+      }
+    }
+    // visée tactile (joueur 1)
+    if(p.id===1 && dashBtn.aiming){
+      p.aiming=true;
+      if(dashBtn.ax||dashBtn.ay){ p.aimX=dashBtn.ax; p.aimY=dashBtn.ay; }
+    }
+
+    if(p.dashing){
+      p.dashT-=dt; p.vx=p.dx*DASH_SPEED; p.vy=p.dy*DASH_SPEED;
+      if(p.dashT<=0) p.dashing=false;
+    } else if(p.stunT>0){
+      p.vx-=p.vx*FRICTION*dt; p.vy-=p.vy*FRICTION*dt;
+    } else if(dir.x||dir.y){
+      const s = p.aiming ? SPEED*AIM_SLOW : SPEED;
+      p.vx=dir.x*s; p.vy=dir.y*s;
+      if(!p.aiming){ p.aimX=dir.x; p.aimY=dir.y; }
+    } else {
+      p.vx-=p.vx*FRICTION*dt; p.vy-=p.vy*FRICTION*dt;
+    }
+
+    p.x+=p.vx*dt; p.y+=p.vy*dt;
+  }
+
+  // obstacle central
+  for(const p of players){
+    if(!p.alive) continue;
+    const d=dist(p.x,p.y,obstacle.x,obstacle.y), min=obstacle.r+RADIUS;
+    if(d<min && d>0){
+      const nx=(p.x-obstacle.x)/d, ny=(p.y-obstacle.y)/d;
+      p.x=obstacle.x+nx*min; p.y=obstacle.y+ny*min;
+      const dot=p.vx*nx+p.vy*ny;
+      p.vx-=2*dot*nx*0.6; p.vy-=2*dot*ny*0.6;
+      if(p.dashing) p.dashing=false;
+    }
+  }
+
+  // joueur vs joueur
+  if(P1.alive && P2.alive){
+    const d=dist(P1.x,P1.y,P2.x,P2.y), min=RADIUS*2;
+    if(d<min && d>0){
+      const nx=(P2.x-P1.x)/d, ny=(P2.y-P1.y)/d, ov=(min-d)/2;
+      P1.x-=nx*ov; P1.y-=ny*ov; P2.x+=nx*ov; P2.y+=ny*ov;
+      if(P1.dashing && !P2.dashing){
+        P2.vx=nx*KNOCK; P2.vy=ny*KNOCK; P2.stunT=0.35; P2.dashing=false;
+        P1.dashing=false; P1.vx*=-0.2; P1.vy*=-0.2;
+      } else if(P2.dashing && !P1.dashing){
+        P1.vx=-nx*KNOCK; P1.vy=-ny*KNOCK; P1.stunT=0.35; P1.dashing=false;
+        P2.dashing=false; P2.vx*=-0.2; P2.vy*=-0.2;
+      } else if(P1.dashing && P2.dashing){
+        P1.vx=-nx*KNOCK*0.7; P1.vy=-ny*KNOCK*0.7; P1.dashing=false; P1.stunT=0.3;
+        P2.vx= nx*KNOCK*0.7; P2.vy= ny*KNOCK*0.7; P2.dashing=false; P2.stunT=0.3;
+      }
+    }
+  }
+
+  // élimination hors du cercle
+  for(const p of players){
+    if(!p.alive) continue;
+    if(dist(p.x,p.y,arena.cx,arena.cy) > arena.r+RADIUS){
+      p.alive=false;
+      const other=(p===P1)?P2:P1;
+      other.score++; updateScore();
+      setTimeout(()=>{ if(running) resetRound(); },700);
+    }
+  }
+
+  if(dashBtn.flash>0) dashBtn.flash-=dt;
+}
+
+/* ================= DRAW ================= */
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  ctx.fillStyle='#1C1730';
+  ctx.beginPath(); ctx.arc(arena.cx,arena.cy,arena.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,214,102,0.5)'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.arc(arena.cx,arena.cy,arena.r,0,Math.PI*2); ctx.stroke();
+
+  ctx.fillStyle='#3A3358';
+  ctx.beginPath(); ctx.arc(obstacle.x,obstacle.y,obstacle.r,0,Math.PI*2); ctx.fill();
+
+  for(const p of players){
+    if(!p.alive) continue;
+
+    // flèche de visée
+    if(p.aiming){
+      const len=68;
+      const ex=p.x+p.aimX*len, ey=p.y+p.aimY*len;
+      ctx.strokeStyle='rgba(255,255,255,0.5)'; ctx.lineWidth=4; ctx.setLineDash([7,6]);
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(ex,ey); ctx.stroke();
+      ctx.setLineDash([]);
+      const a=Math.atan2(p.aimY,p.aimX);
+      ctx.fillStyle='rgba(255,255,255,0.8)';
+      ctx.beginPath();
+      ctx.moveTo(ex+Math.cos(a)*10, ey+Math.sin(a)*10);
+      ctx.lineTo(ex+Math.cos(a+2.5)*11, ey+Math.sin(a+2.5)*11);
+      ctx.lineTo(ex+Math.cos(a-2.5)*11, ey+Math.sin(a-2.5)*11);
+      ctx.closePath(); ctx.fill();
+    }
+
+    ctx.fillStyle=p.color;
+    ctx.beginPath(); ctx.arc(p.x,p.y,RADIUS,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.6)'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.arc(p.x,p.y,RADIUS,0,Math.PI*2); ctx.stroke();
+
+    if(p.dashing){
+      ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=6;
+      ctx.beginPath(); ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x-p.dx*26,p.y-p.dy*26); ctx.stroke();
+    }
+    if(p.cdT>0){
+      const r=1-p.cdT/DASH_CD;
+      ctx.strokeStyle='rgba(255,255,255,0.45)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(p.x,p.y,RADIUS+6,-Math.PI/2,-Math.PI/2+Math.PI*2*r); ctx.stroke();
+    }
+  }
+
+  drawControls();
+}
+
+function drawControls(){
+  ctx.fillStyle='rgba(255,255,255,0.10)';
+  ctx.beginPath(); ctx.arc(stick.cx,stick.cy,stick.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.arc(stick.cx,stick.cy,stick.r,0,Math.PI*2); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,0.32)';
+  ctx.beginPath(); ctx.arc(stick.kx,stick.ky,stick.r*0.4,0,Math.PI*2); ctx.fill();
+
+  const ready = P1.cdT<=0;
+  const a = dashBtn.aiming?0.55 : (dashBtn.flash>0?0.5 : (ready?0.28:0.12));
+  ctx.fillStyle=`rgba(255,214,102,${a})`;
+  ctx.beginPath(); ctx.arc(dashBtn.cx,dashBtn.cy,dashBtn.r,0,Math.PI*2); ctx.fill();
+  ctx.strokeStyle=`rgba(255,214,102,${ready?0.8:0.35})`; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(dashBtn.cx,dashBtn.cy,dashBtn.r,0,Math.PI*2); ctx.stroke();
+
+  // aperçu de la direction visée dans le bouton
+  if(dashBtn.aiming && (dashBtn.ax||dashBtn.ay)){
+    ctx.strokeStyle='rgba(255,255,255,0.85)'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(dashBtn.cx,dashBtn.cy);
+    ctx.lineTo(dashBtn.cx+dashBtn.ax*dashBtn.r*0.75, dashBtn.cy+dashBtn.ay*dashBtn.r*0.75);
+    ctx.stroke();
+  } else {
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.font=`700 ${Math.round(dashBtn.r*0.4)}px Inter, sans-serif`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('DASH', dashBtn.cx, dashBtn.cy);
+  }
+}
+
+/* ================= BOUCLE ================= */
+let last=0;
+function loop(ts){
+  if(!running) return;
+  if(!last) last=ts;
+  const dt=Math.min((ts-last)/1000,0.033); last=ts;
+  update(dt); draw();
+  requestAnimationFrame(loop);
+}
+
+/* ================= NAVIGATION ================= */
+document.getElementById('play').addEventListener('click',()=>{
+  menuView.classList.remove('on'); gameView.classList.add('on');
+  running=true; last=0;
+  P1.score=0; P2.score=0;
+  P2.isBot = soloMode;
+  resize(); resetRound();
+  requestAnimationFrame(loop);
+});
+document.getElementById('back').addEventListener('click',()=>{
+  running=false;
+  gameView.classList.remove('on'); menuView.classList.add('on');
+});
+
+applyLang();
+</script>
+</body>
+</html>
